@@ -1,0 +1,27 @@
+=== APPLICATION DE VOTE - DEMARRAGE RAPIDE ===
+
+1. LANCER L'APPLICATION
+
+cd voting-app
+docker-compose up -d
+
+2. ACCEDER AUX APPLICATIONS
+
+Vote   : http://localhost:8080
+Result : http://localhost:8888
+
+3. ARRETER
+
+docker-compose down
+
+4. VOIR LES LOGS
+
+docker-compose logs -f
+
+5. POUR DOCKER SWARM
+
+Voir le fichier DEPLOYMENT.md
+
+===
+
+Pour plus d'infos : README.md

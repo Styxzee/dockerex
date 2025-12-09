@@ -1,0 +1,114 @@
+version: '3.8'
+
+networks:
+  front-tier:
+    driver: bridge
+  back-tier:
+    driver: bridge
+
+
+volumes:
+  db-data:
+    driver: local
+  redis-data:
+    driver: local
+
+services:
+
+  redis:
+    image: redis:7-alpine
+    container_name: voting-redis
+    networks:
+      - back-tier
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+
+  db:
+    image: postgres:15-alpine
+    container_name: voting-db
+    networks:
+      - back-tier
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+
+  vote:
+    build:
+      context: ./vote
+      dockerfile: Dockerfile
+    container_name: voting-vote
+    ports:
+      - "8080:8080"
+    networks:
+      - front-tier
+      - back-tier
+    environment:
+      REDIS_HOST: redis
+      OPTION_A: ${OPTION_A:-Cats}
+      OPTION_B: ${OPTION_B:-Dogs}
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: voting-worker
+    networks:
+      - back-tier
+    environment:
+      REDIS_HOST: redis
+      DB_HOST: db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: postgres
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+
+  result:
+    build:
+      context: ./result
+      dockerfile: Dockerfile
+    container_name: voting-result
+    ports:
+      - "8888:8888"
+    networks:
+      - front-tier
+      - back-tier
+    environment:
+      DB_HOST: db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: postgres
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
